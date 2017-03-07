@@ -7,7 +7,7 @@ apt_repository "docker" do
   key "https://apt.dockerproject.org/gpg"
 end
 
-#Buscar otra manera de refrescar el apt-cache
+#Look for another way to force update of apt-cache
 # execute "apt-get-update" do
 #   command "apt-get update"
 # end

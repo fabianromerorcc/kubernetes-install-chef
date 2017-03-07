@@ -14,3 +14,12 @@ end
 
 package ['docker-engine', 'bridge-utils']
 
+execute "create ssh keys" do
+  command "ssh-keygen -t rsa -f ~/.ssh/id_rsa -q -N ''"
+end
+
+execute "add keys for no passwd login" do
+  command "cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"
+end
+
+

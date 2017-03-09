@@ -1,10 +1,19 @@
-package ['apt-transport-https', 'ca-certificates', 'linux-image-extra-$(uname -r)', 'linux-image-extra-virtual']
+#
+## Cookbook Name:: kubernetes_install
+## Recipe:: default
+##
+## Copyright 2017, Universidad de Chile
+##
+## License MIT
+##
 
-apt_repository "docker" do
-  uri "https://apt.dockerproject.org/repo"
+package ["apt-transport-https", "ca-certificates", "linux-image-extra-#{node[:os_version]}", "linux-image-extra-virtual"]
+
+apt_repository 'docker' do
+  uri 'https://apt.dockerproject.org/repo'
   distribution "#{node['platform']}-#{node['lsb']['codename']}"
-  components ["main"]
-  key "https://apt.dockerproject.org/gpg"
+  components ['main']
+  key 'https://apt.dockerproject.org/gpg'
 end
 
 #Look for another way to force update of apt-cache
@@ -40,7 +49,7 @@ tar_extract '/media/storage/kubernetes/server/kubernetes-salt.tar.gz' do
   tar_flags ['--strip-components 1']
 end
 
-hostname = `hostname -i |awk '{print $1}'`.chomp
+hostname = node[:ipaddress]
 
 
 template '/media/storage/kubernetes/cluster/addons/dns/skydns-rc.yaml.sed' do
@@ -69,7 +78,7 @@ end
 #TODO replace only_if with a service validation
 execute 'start kube install' do
   command 'KUBERNETES_PROVIDER=ubuntu ./kube-up.sh'
-  cwd '//media/storage/kubernetes/cluster'
+  cwd '/media/storage/kubernetes/cluster'
   only_if {`ps cax |grep kube |wc -l`.to_i == 0}
 end
 
@@ -84,4 +93,38 @@ end
 #
 link '/usr/local/bin/kubectl' do
   to '/media/storage/kubernetes/cluster/ubuntu/binaries/kubectl'
+end
+
+#TODO Validate if this was done
+execute 'kubectl completition' do
+  command <<-EOF
+    #!/usr/bin/env bash && \
+    source <(kubectl completion bash) && \  
+    echo 'source <(kubectl completion bash)' >> ~/.bash_profile
+  EOF
+end
+
+#FIXME Validation in only_if not working
+execute 'deploy kube-dns and dashboard' do
+  command 'KUBERNETES_PROVIDER=ubuntu ./deployAddons.sh'
+  cwd '/media/storage/kubernetes/cluster/ubuntu'
+  only_if {shell_out('ps cax |grep kube-dns |wc -l').stdout.to_i == 0}
+  notifies :run, 'execute[install busybox]', :delayed
+  notifies :run, 'execute[install kubernetes bootcamp]', :delayed
+end
+
+#TODO Install kubernetes-bootcamp and busybox to test the cluster
+execute 'install kubernetes bootcamp' do
+  command 'kubectl run kubernetes-bootcamp --image=docker.io/jocatalin/kubernetes-bootcamp:v1 --port=8080'
+  action :nothing
+end
+
+cookbook_file '/media/storage/busybox.yaml' do
+  source 'busybox.yaml'
+end
+
+execute 'install busybox' do
+  command 'kubectl create -f busybox.yaml'
+  cwd '/media/storage/'
+  action :nothing
 end

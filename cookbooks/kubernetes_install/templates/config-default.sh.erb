@@ -55,7 +55,7 @@ CNI_KUBELET_TRIGGER=${CNI_KUBELET_TRIGGER:-networking}
 # Flannel networking is used if CNI networking is not.  The following
 # variable defines the CIDR block from which cluster addresses are
 # drawn.
-export FLANNEL_NET=${FLANNEL_NET:-10.0.0.1/24}
+export FLANNEL_NET=${FLANNEL_NET:-10.0.0.1/20}
 
 # If Flannel networking is used then the following variable can be
 # used to customize the Flannel backend.  The variable's value should

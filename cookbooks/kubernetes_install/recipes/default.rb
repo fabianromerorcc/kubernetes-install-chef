@@ -7,6 +7,15 @@
 ## License MIT
 ##
 
+user_home = ENV['HOME']
+user = ENV['USER']
+
+#TODO Add check to do this once
+execute 'package update if vagrant' do
+  command 'apt-get update'
+  only_if { File.directory?('/home/vagrant') }
+end
+
 package ["apt-transport-https", "ca-certificates", "linux-image-extra-#{node[:os_version]}", "linux-image-extra-virtual"]
 
 apt_repository 'docker' do
@@ -16,26 +25,26 @@ apt_repository 'docker' do
   key 'https://apt.dockerproject.org/gpg'
 end
 
-#Look for another way to force update of apt-cache
-# execute "apt-get-update" do
-#   command "apt-get update"
-# end
-
 package ['docker-engine', 'bridge-utils']
 
-#FIXME manage the prompt when key is already created
+#TODO add feature to create keys to N servers according to config-default.sh
 execute "create ssh keys" do
-  command "ssh-keygen -t rsa -f ~/.ssh/id_rsa -q -N ''"
-  ignore_failure true
+  command "ssh-keygen -t rsa -f #{user_home}/.ssh/id_rsa -q -N ''"
+  creates "#{user_home}/.ssh/id_rsa.pub"
 end
 
-#FIXME execute this if ssh keys creation is successful
-execute "add keys for no passwd login" do
-  command "cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"
+#TODO Add guard to avoid entering this code all the time
+ruby_block 'add keys to authorized_keys' do
+  block do
+    auth_keys = Chef::Util::FileEdit.new("#{user_home}/.ssh/authorized_keys")
+    id_pub = ''
+    id_pub = File.open("#{user_home}/.ssh/id_rsa.pub", &:readline)
+    auth_keys.insert_line_if_no_match(/\b#{user}@#{node[:hostname]}\b/, id_pub)
+    auth_keys.write_file
+  end
 end
 
 directory '/media/storage'
-
 
 #I didn't find a way to autocreate target_dir if doesn't exist
 tar_extract 'https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v1.5.1/kubernetes.tar.gz' do
@@ -49,20 +58,19 @@ tar_extract '/media/storage/kubernetes/server/kubernetes-salt.tar.gz' do
   tar_flags ['--strip-components 1']
 end
 
-hostname = node[:ipaddress]
-
+host_ip = node[:ipaddress]
 
 template '/media/storage/kubernetes/cluster/addons/dns/skydns-rc.yaml.sed' do
   source 'skydns-rc.yaml.sed.erb'
   variables ({
-    :hostname  => hostname
+    :host_ip  => host_ip
   })
 end
 
 template '/media/storage/kubernetes/cluster/addons/dashboard/dashboard-controller.yaml' do
   source 'dashboard-controller.yaml.erb'
   variables ({
-    :hostname  => hostname
+    :host_ip  => host_ip
   })
 end
 
@@ -70,7 +78,7 @@ template '/media/storage/kubernetes/cluster/ubuntu/util.sh' do
   source 'util.sh.erb'
 end
 
-#Check template again when installing in definitive environment
+#Important to check this file and make sure that IPs are good fit for environment
 template '/media/storage/kubernetes/cluster/ubuntu/config-default.sh' do
   source 'config-default.sh.erb'
 end
@@ -82,25 +90,16 @@ execute 'start kube install' do
   only_if {`ps cax |grep kube |wc -l`.to_i == 0}
 end
 
-# kubectl_path = '/media/storage/kubernetes/cluster/ubuntu/binaries/kubectl'
-# if File.exists?(kubectl_path)
-#   file '/usr/local/bin/kubectl' do
-#     content IO.read(kubectl_path)
-#     mode '775'
-#     # only_if {File.exist?('/media/storage/kubernetes/cluster/ubuntu/binaries/kubectl')}
-#   end
-# end
-#
 link '/usr/local/bin/kubectl' do
   to '/media/storage/kubernetes/cluster/ubuntu/binaries/kubectl'
 end
 
-#TODO Validate if this was done
+#FIXME Validate if this was done
 execute 'kubectl completition' do
   command <<-EOF
     #!/usr/bin/env bash && \
     source <(kubectl completion bash) && \  
-    echo 'source <(kubectl completion bash)' >> ~/.bash_profile
+    echo 'source <(kubectl completion bash)' >> #{user_home}/.bash_profile
   EOF
 end
 
@@ -113,7 +112,7 @@ execute 'deploy kube-dns and dashboard' do
   notifies :run, 'execute[install kubernetes bootcamp]', :delayed
 end
 
-#TODO Install kubernetes-bootcamp and busybox to test the cluster
+#Installation of kubernetes-bootcamp and busybox to test the cluster
 execute 'install kubernetes bootcamp' do
   command 'kubectl run kubernetes-bootcamp --image=docker.io/jocatalin/kubernetes-bootcamp:v1 --port=8080'
   action :nothing

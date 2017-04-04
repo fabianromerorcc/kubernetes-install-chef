@@ -36,7 +36,7 @@ echo 'source <(chef shell-init bash)' >> ~/.bash_profile
 ## Recipe installation
 Clone repo and cd into folder
 ```
-git clone http://rocarras.uchile.cl:9000/faromero/kubernetes-recipes.git && cd kubernetes-recipes
+git clone https://github.com/fabianromerorcc/kubernetes-install-chef.git && cd kubernetes-install-chef
 ```
 
 ## Run recipe

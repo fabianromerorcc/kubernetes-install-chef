@@ -83,6 +83,10 @@ template '/media/storage/kubernetes/cluster/ubuntu/config-default.sh' do
   source 'config-default.sh.erb'
 end
 
+cookbook_file '/media/storage/kubernetes/cluster/ubuntu/download-release.sh' do
+  source 'download-release.sh'
+end
+
 #TODO replace only_if with a service validation
 execute 'start kube install' do
   command 'KUBERNETES_PROVIDER=ubuntu ./kube-up.sh'
